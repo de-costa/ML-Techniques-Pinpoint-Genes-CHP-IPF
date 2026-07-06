@@ -22,4 +22,28 @@ sum(is.na(g_data))
 
 # But there is one problem. classes are not balanced. low expression of a gene may be due that imbalance.
 # what if chp is the only thing that expressed the gene. then we will get a low expression too.
-sapply(g_data, sum, 1)
+
+
+# Bioconductor provide software tool for bioinformatics analysis. It suggest that for they have a package called
+# GEOquerry that can be used to work with GSE data. 
+# for that we need to install 'BiocManager' and install the 'GEOquery' using their package manager.
+
+# this {install.packages("BiocManager")} is anoying. so wrap it out . it only install when it is not already installed
+
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install("GEOquery")
+
+library(GEOquery)
+
+# gse matrix kiyana eka awe na. poddak balanna
+gse_150910 <- getGEO("GSE150910", GSEMatrix = TRUE)
+
+class(gse_150910)
+length(gse_150910)
+
+# see
+
+gse_150910[[1]]
+
