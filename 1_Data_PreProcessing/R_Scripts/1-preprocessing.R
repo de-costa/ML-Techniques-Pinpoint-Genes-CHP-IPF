@@ -1,19 +1,3 @@
-# lets import our dataset
-g_data <- read.csv("../../DATASET/GSE150910_gene-level_count_file.csv", header = TRUE, sep = ",") # we have a comma seperrated file
-
-head(g_data)
-# columns = subjects
-  # chp = 82
-  # ipf = 103
-  # control = 103 
-# rows = genes (18838)
-# total_data = (18838)*(82+103+103) = 5425344
-
-# lets see null values
-anyNA(g_data)
-sum(is.na(g_data))
-# colSums(is.na(g_data)) # check for each columns
-
 # i want to remove the low expressed genes first. But we cant remove a arbitrary value from subjects.
 # if we remove we have to remove entire rows.
 # so that we can take total gene count in each row. 
@@ -47,13 +31,15 @@ gse_150910 <- getGEO("GSE150910",GSEMatrix  = TRUE,AnnotGPL = FALSE, destdir="..
 metadata <- pData(gse_150910[[1]])
 # to see how many data we have in header.
 dim(metadata)
-
+# 
 # wanna see the what data is present in a sample. transpose it so that easier to read
 t(metadata[1,])
 
 # find how many samples are there in each category
 print(table(metadata$`diagnosis:ch1`))
 
+
+all(colnames(g_data) %in% meta_clean$sample_id)
 # Create clean metadata table with relevant columns
 meta_clean <- data.frame(
   sample_id = metadata$title,
@@ -89,4 +75,38 @@ cat("Perfect alignment:",
 # Start the process of genotype data
 ###############################################################################################################
 
+# lets import our dataset
+g_data <- read.csv("../../DATASET/GSE150910_gene-level_count_file.csv", header = TRUE, sep = ",", row.names = 1) 
+# we have a comma seperrated file
 
+head(g_data)
+# columns = subjects
+cat("  Genes:   ", nrow(g_data), "\n") # rows = genes (18838)
+cat("  Samples: ", ncol(g_data), "\n") # column = samples (288)
+
+# chp = 82
+# ipf = 103
+# control = 103 
+
+# lets see null values
+anyNA(g_data)
+sum(is.na(g_data))
+# colSums(is.na(g_data)) # check for each columns
+
+
+###############################################################################################################
+# testing the data of the header and counts are matches
+###############################################################################################################
+
+
+
+###############################################################################################################
+# PLOT noises
+###############################################################################################################
+
+
+
+
+###############################################################################################################
+# LOW EXPRESSION DATA
+###############################################################################################################
