@@ -37,12 +37,40 @@ BiocManager::install("GEOquery")
 
 library(GEOquery)
 
-# gse matrix kiyana eka awe na. poddak balanna
-gse_150910 <- getGEO("GSE150910", GSEMatrix = TRUE)
+gse_150910 <- getGEO("GSE150910",GSEMatrix  = TRUE,AnnotGPL = FALSE)
 
-class(gse_150910)
-length(gse_150910)
+# Extract metadata
+metadata <- pData(gse_150910[[1]])
+dim(metadata)
+print(table(metadata$`diagnosis:ch1`))
 
+# Create clean metadata table with relevant columns
+meta_clean <- data.frame(
+  sample_id = metadata$title,
+  diagnosis = metadata$`diagnosis:ch1`,
+  batch     = metadata$`batch:ch1`,
+  sex       = metadata$`Sex:ch1`,
+  age       = metadata$`age:ch1`,
+  row.names = metadata$title
+)
+
+head(meta_clean)
+
+table(meta_clean$diagnosis)
+
+table(meta_clean$batch)
+
+cat("All samples found in metadata:", all(colnames(counts) %in% rownames(meta_clean)), "\n")
+
+# Reorder metadata to match count matrix column order
+meta_clean <- meta_clean[colnames(counts), ]
+
+# Verify perfect alignment
+cat("Perfect alignment:",
+    all(colnames(counts) == rownames(meta_clean)), "\n")
+
+##metadata is loaded correctly and check whether it is matching with g_data
+##----------------------------------------------------->
 # see
 
 gse_150910[[1]]
