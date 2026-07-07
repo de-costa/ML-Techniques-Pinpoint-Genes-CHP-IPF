@@ -37,11 +37,21 @@ BiocManager::install("GEOquery")
 
 library(GEOquery)
 
-gse_150910 <- getGEO("GSE150910",GSEMatrix  = TRUE,AnnotGPL = FALSE)
+#sp: I added the a directory path for downloading the data {getGEO()}. otherwise. it is downloaded to temp derectory. i have to download it
+#sp: every time i re-open r
+#sp: reference for getGEO : https://www.rdocumentation.org/packages/GEOquery/versions/2.38.4/topics/getGEO
+
+gse_150910 <- getGEO("GSE150910",GSEMatrix  = TRUE,AnnotGPL = FALSE, destdir="../../DATASET")
 
 # Extract metadata
 metadata <- pData(gse_150910[[1]])
+# to see how many data we have in header.
 dim(metadata)
+
+# wanna see the what data is present in a sample. transpose it so that easier to read
+t(metadata[1,])
+
+# find how many samples are there in each category
 print(table(metadata$`diagnosis:ch1`))
 
 # Create clean metadata table with relevant columns
@@ -56,11 +66,13 @@ meta_clean <- data.frame(
 
 head(meta_clean)
 
-table(meta_clean$diagnosis)
+# table(meta_clean$diagnosis)
 
-table(meta_clean$batch)
+table(meta_clean$batch) # according to the data, if we use the raw data. we will face batch effect. Better to use preprocessed count
 
-cat("All samples found in metadata:", all(colnames(counts) %in% rownames(meta_clean)), "\n")
+###@@@@@@@@issue@@@@@@@###  count kiyanne mokadda
+
+cat("All samples found in metadata:", all(colnames(counts) %in% rownames(meta_clean)), "\n") 
 
 # Reorder metadata to match count matrix column order
 meta_clean <- meta_clean[colnames(counts), ]
@@ -71,7 +83,10 @@ cat("Perfect alignment:",
 
 ##metadata is loaded correctly and check whether it is matching with g_data
 ##----------------------------------------------------->
-# see
 
-gse_150910[[1]]
+
+###############################################################################################################
+# Start the process of genotype data
+###############################################################################################################
+
 
