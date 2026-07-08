@@ -17,20 +17,25 @@
 if (!requireNamespace("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
 
-BiocManager::install("GEOquery")
+BiocManager::install(c("GEOquery", "DESeq2", "limma"),
+                     update = FALSE)
+
+install.packages(c("dplyr", "ggplot2", "pheatmap"),
+                 dependencies = TRUE)
 
 library(GEOquery)
-
+library(DESeq2)
+library(limma)
+library(dplyr)
+library(ggplot2)
+library(pheatmap)
 #sp: I added the a directory path for downloading the data {getGEO()}. otherwise. it is downloaded to temp derectory. i have to download it
 #sp: every time i re-open r
 #sp: reference for getGEO : https://www.rdocumentation.org/packages/GEOquery/versions/2.38.4/topics/getGEO
 
-gse_150910 <- getGEO("GSE150910",GSEMatrix  = TRUE,AnnotGPL = FALSE, destdir="../../DATASET")
 
-# Extract metadata
-metadata <- pData(gse_150910[[1]])
-# to see how many data we have in header.
-dim(metadata)
+
+
 # 
 # wanna see the what data is present in a sample. transpose it so that easier to read
 t(metadata[1,])
@@ -72,7 +77,7 @@ cat("Perfect alignment:",
 
 
 ###############################################################################################################
-# Start the process of genotype data
+# Start the process of genotype data and metadata
 ###############################################################################################################
 
 # lets import our dataset
@@ -94,11 +99,35 @@ sum(is.na(g_data))
 # colSums(is.na(g_data)) # check for each columns
 
 
+gse_150910 <- getGEO("GSE150910",GSEMatrix  = TRUE,AnnotGPL = FALSE, destdir="../../DATASET")
+# Extract metadata
+metadata <- pData(gse_150910[[1]])
+# to see how many data we have in header.
+dim(metadata)
+cat("\nDiagnosis groups:\n")
+print(table(metadata$`diagnosis:ch1`))
+
+
 ###############################################################################################################
 # testing the data of the header and counts are matches
 ###############################################################################################################
+meta_clean <- data.frame(
+  sample_id = metadata$title,
+  diagnosis = metadata$`diagnosis:ch1`,
+  batch     = metadata$`batch:ch1`,
+  sex       = metadata$`Sex:ch1`,
+  age       = metadata$`age:ch1`,
+  row.names = metadata$title
+)
 
+print(head(meta_clean))
 
+print(table(meta_clean$diagnosis))
+
+meta_clean <- meta_clean[colnames(g_data), ]
+
+#check the alignment is correct in both datasets
+all(colnames(counts) == rownames(meta_clean))
 
 ###############################################################################################################
 # PLOT noises
