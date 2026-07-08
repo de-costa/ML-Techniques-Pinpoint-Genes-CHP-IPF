@@ -104,7 +104,33 @@ sum(is.na(g_data))
 # PLOT noises
 ###############################################################################################################
 
+# i want to add the every count of a gene of all samples. That means i want to get the summation of values along rows.
+# then from all rows we can plot histogram
+# to see the out liers.
 
+# i am using 'apply()' function for this and default 'plot()'
+# refere the links to understand
+# https://www.geeksforgeeks.org/r-language/apply-lapply-sapply-and-tapply-in-r/
+# https://youtu.be/_V8eKsto3Ug 44:44
+
+gene_counts = apply(g_data, MARGIN= 1 , FUN=sum)
+print(gene_counts)
+
+# this is not good way to watch them. it is messy
+
+type(gene_counts) # int - means this is a pairlist of integers and names. we can seperate them and make a datafreame
+
+# refere 
+# for integer separation : https://www.geeksforgeeks.org/r-language/as-numeric-function-in-r/
+# for name seperation : https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/names
+
+# lets make a dataframe with coulumns 'gene_name' and 'count'
+gene_counts_df = data.frame(
+  gene_name = names(gene_counts),
+  count = as.numeric(gene_counts)
+)
+
+print(gene_counts_df) # better
 
 
 ###############################################################################################################
