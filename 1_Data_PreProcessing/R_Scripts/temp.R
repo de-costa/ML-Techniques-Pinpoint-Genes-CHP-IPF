@@ -35,7 +35,7 @@ cat("\nLoading gene-level count matrix...\n")
 # This file already has genes as rows and samples as columns
 # No aggregation needed — cleaner than transcript-level file
 counts <- read.csv(
-  "D:/Research/implementation/step01/GSE150910_gene-level_count_file.csv.gz",
+  "../../DATASET/GSE150910_gene-level_count_file.csv",
   row.names = 1,    # First column = gene names as row names
   check.names = FALSE)  # Keep original sample names
 
