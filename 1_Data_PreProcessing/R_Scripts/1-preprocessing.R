@@ -33,10 +33,13 @@ library(pheatmap)
 #sp: every time i re-open r
 #sp: reference for getGEO : https://www.rdocumentation.org/packages/GEOquery/versions/2.38.4/topics/getGEO
 
+gse_150910 <- getGEO("GSE150910",GSEMatrix  = TRUE,AnnotGPL = FALSE, destdir="../../DATASET")
 
+# Extract metadata
+metadata <- pData(gse_150910[[1]])
+# to see how many data we have in header.
+dim(metadata)
 
-
-# 
 # wanna see the what data is present in a sample. transpose it so that easier to read
 t(metadata[1,])
 
@@ -236,3 +239,5 @@ ggplot(gene_counts_df, aes(x = log10(count + 1))) +
 ###############################################################################################################
 # LOW EXPRESSION DATA
 ###############################################################################################################
+
+
