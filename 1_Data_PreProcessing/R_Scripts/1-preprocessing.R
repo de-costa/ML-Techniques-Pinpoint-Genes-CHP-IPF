@@ -202,6 +202,9 @@ curve(dnorm(x, mean = mean_val, sd = sd_val),
 
 # to do that we can use 'ggplot' 's scale_x_log10 attribute
 # refere this to understand how it works : https://www.r-bloggers.com/2021/08/beginning-a-ggplot2-series-logarithmize-your-scales/
+# please watch the video and understand the easthetic function : https://www.youtube.com/watch?v=CLUnPk_1oaE&t=149s
+# in aesthetic we have add 1 for every gene counts. we call it 'Pseudo-count' 
+# we are doing it because there is no definition for log0. but we have 0 values
 
 install.packages("ggplot2")
 library(ggplot2)
@@ -212,9 +215,22 @@ ggplot(gene_counts_df, aes(x = count + 1)) +
   labs(title = "Log10 Transformed Gene Counts",
        x = "Gene Counts (Log10 scale, count + 1)",
        y = "Frequency (Number of Genes)") +
-  theme_minimal()
+  theme_minimal() # to have a classic backgroud for the graph
 
 # now we can see thar in some specific ranges in left tail gene counts are very low. there are many genes near zero expression counts
+
+
+# we can cleary see that using a 'x intercept'
+# lets make a density curve for better smoothness
+# we cut the genes that has expression for all samples under 10. for 288 samples. those are noise
+
+ggplot(gene_counts_df, aes(x = log10(count + 1))) +
+  geom_density(fill = "purple", alpha = 0.5, color = "black") +
+  geom_vline(xintercept = log10(10 + 1), color = "red", linetype = "dashed", size = 1) +
+  labs(title = "Density Plot of Gene Counts",
+       x = "Log10(Count + 1)",
+       y = "Density") +
+  theme_minimal()
 
 
 ###############################################################################################################
