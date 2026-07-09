@@ -162,6 +162,61 @@ gene_counts_df = data.frame(
 print(gene_counts_df) # better
 
 
+# befor plotting the data. we need to know the minimum and maximum values of the data
+print(min(gene_counts_df$count))
+print(max(gene_counts_df$count))
+
+# lets try to plot using Base R
+# i want to divide the range to 100 bins.
+# that means bin width is  = {max-min}/100
+# it is arround = 2775142.76 
+# so a bar represent a huge range
+# and in this dataset most of the data is at the begining
+# so it is hard to visulize the whole data using this.
+# but lets try
+
+# here i want to see the pobabilty distribution. not the frequency.
+# that why probability = TRUE,
+# breaks = 100, for dividing the range
+hist(gene_counts_df$count, 
+     probability = TRUE, 
+     breaks = 100, 
+     col = "lightblue", 
+     main = "Histogram with Normal Curve", 
+     xlab = "Gene Counts")
+
+# now i want to plot a curve to see how it would be if this is a normal distribution
+# we can do that using 'cruve(dnorm())' 
+# we need to enter the mean and standard deviation of our data as parameters
+mean_val <- mean(gene_counts_df$count)
+sd_val <- sd(gene_counts_df$count)
+
+curve(dnorm(x, mean = mean_val, sd = sd_val), 
+      add = TRUE, 
+      col = "red", 
+      lwd = 2)
+
+
+# now we see that this is not a good representation.
+# lets rescale the x axis to logorithms
+
+# to do that we can use 'ggplot' 's scale_x_log10 attribute
+# refere this to understand how it works : https://www.r-bloggers.com/2021/08/beginning-a-ggplot2-series-logarithmize-your-scales/
+
+install.packages("ggplot2")
+library(ggplot2)
+
+ggplot(gene_counts_df, aes(x = count + 1)) +
+  geom_histogram(bins = 100, fill = "steelblue", color = "black") +
+  scale_x_log10() +
+  labs(title = "Log10 Transformed Gene Counts",
+       x = "Gene Counts (Log10 scale, count + 1)",
+       y = "Frequency (Number of Genes)") +
+  theme_minimal()
+
+# now we can see thar in some specific ranges in left tail gene counts are very low. there are many genes near zero expression counts
+
+
 ###############################################################################################################
 # LOW EXPRESSION DATA
 ###############################################################################################################
