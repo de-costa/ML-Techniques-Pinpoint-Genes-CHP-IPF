@@ -229,7 +229,7 @@ ggplot(gene_counts_df, aes(x = count + 1)) +
 
 ggplot(gene_counts_df, aes(x = log10(count + 1))) +
   geom_density(fill = "purple", alpha = 0.5, color = "black") +
-  geom_vline(xintercept = log10(10 + 1), color = "red", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = log10(80 + 1), color = "red", linetype = "dashed", size = 1) +
   labs(title = "Density Plot of Gene Counts",
        x = "Log10(Count + 1)",
        y = "Density") +
@@ -259,12 +259,37 @@ head(low_expr_gene_names)
 
 # we can make the filetered dataset by taking the all the rows that has not 'gene_name' in 'low_expr_gene_names', with all the columns
 
-gene_count_df_rmvd_low <- g_data[!(rownames(g_data) %in% low_expr_gene_names), ]
+g_data_rmvd_low <- g_data[!(rownames(g_data) %in% low_expr_gene_names), ]
 
 # lets check the dimensions of the data so that we can verify whether the cutting correct or wrong
-dim(gene_count_df_rmvd_low) # it has 17931 entries we cutted 907 entrie . so total is 18838. data frame is correct
+dim(g_data_rmvd_low) # it has 17931 entries we cutted 907 entrie . so total is 18838. data frame is correct
 
 # we can use write.csv to save the dataframe as a csv file. if we want enter the data row names , we need to specify 'row.names' attribute as true
-write.csv(gene_count_df_rmvd_low, file = "../../DATASET/gene_count_df_rmvd_low.csv", row.names = TRUE)
+write.csv(g_data_rmvd_low, file = "../../DATASET/g_data_rmvd_low.csv", row.names = TRUE)
 
 
+#** LETS PLOT THE DENSITY CURVE NOW **#
+
+# as the way did before.
+# take the count across rows
+# get a list of summatinons
+# make a dataframe only contain gene_name and summations
+# plot using 'ggplot'
+
+gene_counts_rmvd_low = apply(g_data_rmvd_low, MARGIN= 1 , FUN=sum)
+print(gene_counts_rmvd_low)
+
+gene_counts_rmvd_low_df = data.frame(
+  gene_name = names(gene_counts_rmvd_low),
+  count = as.numeric(gene_counts_rmvd_low)
+)
+
+ggplot(gene_counts_rmvd_low_df, aes(x = log10(count + 1))) +
+  geom_density(fill = "yellow", alpha = 0.5, color = "black") +
+  geom_vline(xintercept = log10(80 + 1), color = "red", linetype = "dashed", size = 1) +
+  labs(title = "Density Plot of Gene Counts",
+       x = "Log10(Count + 1)",
+       y = "Density") +
+  theme_minimal()
+
+# now we can see that the low noises has been removed
