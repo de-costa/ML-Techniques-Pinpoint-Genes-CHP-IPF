@@ -240,4 +240,31 @@ ggplot(gene_counts_df, aes(x = log10(count + 1))) +
 # LOW EXPRESSION DATA
 ###############################################################################################################
 
+# we want to remove the genes that are expression level under the 80 , from our study.
+# why 80 ???
+# *** samaples are chp=82, ipf=103, control=103.
+# so that ,to show a class realted feature, the total expression count for a perticular gene for all subjects should be aleast 82
+# so that we cutoff the noise off from 80
+
+# we take the count of 'gene_count*' dataframe's 'count' under 80
+# here we get and idea about how much we can remove
+low_expr_count <- sum(gene_counts_df$count < 80)
+print(paste("Low expression count : ", low_expr_count))
+
+# then we take those gene_names as a list so that we can remove them from our 'gene_count_df'
+low_expr_gene_names <- gene_counts_df$gene_name[gene_counts_df$count < 80]
+
+# just see what we are removing.
+head(low_expr_gene_names)
+
+# we can make the filetered dataset by taking the all the rows that has not 'gene_name' in 'low_expr_gene_names', with all the columns
+
+gene_count_df_rmvd_low <- g_data[!(rownames(g_data) %in% low_expr_gene_names), ]
+
+# lets check the dimensions of the data so that we can verify whether the cutting correct or wrong
+dim(gene_count_df_rmvd_low) # it has 17931 entries we cutted 907 entrie . so total is 18838. data frame is correct
+
+# we can use write.csv to save the dataframe as a csv file. if we want enter the data row names , we need to specify 'row.names' attribute as true
+write.csv(gene_count_df_rmvd_low, file = "../../DATASET/gene_count_df_rmvd_low.csv", row.names = TRUE)
+
 
