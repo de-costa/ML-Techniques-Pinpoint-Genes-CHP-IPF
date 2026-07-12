@@ -36,8 +36,11 @@ library(pheatmap)
 gse_150910 <- getGEO("GSE150910",GSEMatrix  = TRUE,AnnotGPL = FALSE, destdir="../../DATASET")
 
 # Extract metadata
+
 metadata <- pData(gse_150910[[1]])
+
 # to see how many data we have in header.
+
 dim(metadata)
 
 # wanna see the what data is present in a sample. transpose it so that easier to read
@@ -46,8 +49,8 @@ t(metadata[1,])
 # find how many samples are there in each category
 print(table(metadata$`diagnosis:ch1`))
 
+#all(colnames(g_data) %in% meta_clean$sample_id)
 
-all(colnames(g_data) %in% meta_clean$sample_id)
 # Create clean metadata table with relevant columns
 meta_clean <- data.frame(
   sample_id = metadata$title,
@@ -69,7 +72,7 @@ table(meta_clean$batch) # according to the data, if we use the raw data. we will
 cat("All samples found in metadata:", all(colnames(counts) %in% rownames(meta_clean)), "\n") 
 
 # Reorder metadata to match count matrix column order
-meta_clean <- meta_clean[colnames(counts), ]
+# meta_clean <- meta_clean[colnames(counts), ] # this is wrong. this should be 'g_data' instead of counts. so i put this in 'DESeq2 Median of Ratios' and corrected.
 
 # Verify perfect alignment
 cat("Perfect alignment:",
@@ -127,7 +130,7 @@ print(head(meta_clean))
 
 print(table(meta_clean$diagnosis))
 
-meta_clean <- meta_clean[colnames(g_data), ]
+# meta_clean <- meta_clean[colnames(g_data), ]
 
 #check the alignment is correct in both datasets
 all(colnames(counts) == rownames(meta_clean))
@@ -296,6 +299,44 @@ ggplot(gene_counts_rmvd_low_df, aes(x = log10(count + 1))) +
 
 
 ###############################################################################################################
-# LOW EXPRESSION DATA
+# DESeq2 Median of Ratios
 ###############################################################################################################
+
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install("DESeq2")
+
+library(DESeq2)
+
+# Before we want to continue with DESeq2 we need to make a DESeqDataSet object.
+# To make that object we need to enter the count data and coldata. for that we use 'g_data_rmvd_low' and 'meta_clean'
+# If we are using them to combined object, those columns of both dataframes should match each other.
+# so that we need to do some checkings
+
+# check the sample names are available in both dataframes
+print(rownames(g_data_rmvd_low))
+print(rownames(meta_clean))
+
+length(colnames(g_data_rmvd_low))
+length(rownames(meta_clean))
+# we can see that all the names are available. 
+
+# Now that we need to align the both dataframes by their names.
+# We can reassign the head_clean in same order with the g_data
+meta_clean <- meta_clean[colnames(g_data), ]
+
+# lets check is it aligned
+head(colnames(g_data_rmvd_low), 10)
+head(rownames(meta_clean), 10)
+# ok it is aligned
+
+# lets make the DESeqDataSet object
+
+dds <- DESeqDataSetFromMatrix(
+  countData = g_data_rmvd_low,   # our filtered raw count matrix (genes x samples)
+  colData   = meta_clean,        # our sample metadata (must match column order of countData)
+  design    = ~ diagnosis        # we will eventually compare CHP vs IPF vs Control
+)
+
+###### this object creation show a warning. please check it out and fix, or comment if it can be neglect , with reasons.
 
