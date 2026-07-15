@@ -29,57 +29,6 @@ library(limma)
 library(dplyr)
 library(ggplot2)
 library(pheatmap)
-#sp: I added the a directory path for downloading the data {getGEO()}. otherwise. it is downloaded to temp derectory. i have to download it
-#sp: every time i re-open r
-#sp: reference for getGEO : https://www.rdocumentation.org/packages/GEOquery/versions/2.38.4/topics/getGEO
-
-gse_150910 <- getGEO("GSE150910",GSEMatrix  = TRUE,AnnotGPL = FALSE, destdir="../../DATASET")
-
-# Extract metadata
-
-metadata <- pData(gse_150910[[1]])
-
-# to see how many data we have in header.
-
-dim(metadata)
-
-# wanna see the what data is present in a sample. transpose it so that easier to read
-t(metadata[1,])
-
-# find how many samples are there in each category
-print(table(metadata$`diagnosis:ch1`))
-
-#all(colnames(g_data) %in% meta_clean$sample_id)
-
-# Create clean metadata table with relevant columns
-meta_clean <- data.frame(
-  sample_id = metadata$title,
-  diagnosis = metadata$`diagnosis:ch1`,
-  batch     = metadata$`batch:ch1`,
-  sex       = metadata$`Sex:ch1`,
-  age       = metadata$`age:ch1`,
-  row.names = metadata$title
-)
-
-head(meta_clean)
-
-# table(meta_clean$diagnosis)
-
-table(meta_clean$batch) # according to the data, if we use the raw data. we will face batch effect. Better to use preprocessed count
-
-
-cat("All samples found in metadata:", all(colnames(gse_150910) %in% rownames(meta_clean)), "\n") 
-
-# Reorder metadata to match count matrix column order
-# meta_clean <- meta_clean[colnames(counts), ] # this is wrong. this should be 'g_data' instead of counts. so i put this in 'DESeq2 Median of Ratios' and corrected.
-
-# Verify perfect alignment
-cat("Perfect alignment:",
-    all(colnames(gse_150910) == rownames(meta_clean)), "\n")
-
-##metadata is loaded correctly and check whether it is matching with g_data
-##----------------------------------------------------->
-
 
 ###############################################################################################################
 # Start the process of genotype data and metadata
@@ -104,6 +53,10 @@ sum(is.na(g_data))
 # colSums(is.na(g_data)) # check for each columns
 
 #load the ExpressionSet
+#sp: I added the a directory path for downloading the data {getGEO()}. otherwise. it is downloaded to temp derectory. i have to download it
+#sp: every time i re-open r
+#sp: reference for getGEO : https://www.rdocumentation.org/packages/GEOquery/versions/2.38.4/topics/getGEO
+
 gse_150910 <- getGEO("GSE150910",GSEMatrix  = TRUE,AnnotGPL = FALSE, destdir="../../DATASET")
 # Extract metadata
 metadata <- pData(gse_150910[[1]])
@@ -131,8 +84,10 @@ print(table(meta_clean$diagnosis))
 
 # meta_clean <- meta_clean[colnames(g_data), ]
 
+# aligning
+meta_clean <- meta_clean[colnames(g_data), ]
 #check the alignment is correct in both datasets
-all(colnames(counts) == rownames(meta_clean))
+all(colnames(g_data) == rownames(meta_clean))
 
 ###############################################################################################################
 # PLOT noises
@@ -319,7 +274,7 @@ print(rownames(meta_clean))
 length(colnames(g_data_rmvd_low))
 length(rownames(meta_clean))
 # we can see that all the names are available. 
-
+                    
 # Now that we need to align the both dataframes by their names.
 # We can reassign the head_clean in same order with the g_data
 meta_clean <- meta_clean[colnames(g_data), ]
@@ -330,12 +285,76 @@ head(rownames(meta_clean), 10)
 # ok it is aligned
 
 # lets make the DESeqDataSet object
-
 dds <- DESeqDataSetFromMatrix(
   countData = g_data_rmvd_low,   # our filtered raw count matrix (genes x samples)
   colData   = meta_clean,        # our sample metadata (must match column order of countData)
   design    = ~ diagnosis        # we will eventually compare CHP vs IPF vs Control
 )
+dds
+#this gives a warning because of the variables in the design formula represent experimental groups. DESeq2 performs differential expression analysis by comparing these groups, so they must be categorical variables (factors) rather than plain text (characters).
+class(dds)
 
-###### this object creation show a warning. please check it out and fix, or comment if it can be neglect , with reasons.
+meta_clean$diagnosis <- factor(meta_clean$diagnosis)#converts the diagnosis column in meta_clean from a character variable to a factor (categorical variable)
+class(meta_clean$diagnosis) #checks the data type (class) of the diagnosis column in the meta_clean
+#recreate the object
+dds <- DESeqDataSetFromMatrix(
+  countData = g_data_rmvd_low,
+  colData   = meta_clean,
+  design    = ~ diagnosis
+)
 
+#now also give a warning but it can be ignore becuase it says the chp and control is not in correct order.
+dds #now we can obtain correct data 
+
+levels(colData(dds)$diagnosis)
+
+
+# 2026-07-15 start in here
+
+###############################################################################################################
+# NORMALIZATION & VST TRANSFORMATION
+###############################################################################################################
+
+#calculates a normalization factor for each sample
+dds <- estimateSizeFactors(dds)
+sizeFactors(dds)
+
+#Apply Variance Stabilizing Transformation (VST)
+#because of the low expression and high expression noises we do that. this is necessary for the PCA and heatmap 
+vsd <- vst(dds, blind = TRUE) # blind =true means this doing with not considering the sample variation.
+vsd
+vst_matrix <- assay(vsd) #Only the transformed expression values(rpw= genes, columns=samples)
+cat("VST matrix dimensions:", nrow(vst_matrix), "genes x", ncol(vst_matrix), "samples\n")
+
+
+###############################################################################################################
+# VISUALIZATION - PCA PLOT
+###############################################################################################################
+
+
+pca_result <- prcomp(t(vst_matrix), scale. = FALSE)
+pca_var <- round(100 * pca_result$sdev^2 / sum(pca_result$sdev^2), 1)
+
+pca_df <- data.frame(
+  PC1       = pca_result$x[, 1],
+  PC2       = pca_result$x[, 2],
+  diagnosis = meta_clean$diagnosis,
+  batch     = meta_clean$batch
+)
+
+pca_plot <- ggplot(pca_df, aes(PC1, PC2, color = diagnosis)) +
+  geom_point(size = 2.5, alpha = 0.8) +
+  labs(
+    title = "PCA - GSE150910 (Gene-Level Counts)",
+    x     = paste0("PC1 (", pca_var[1], "% variance)"),
+    y     = paste0("PC2 (", pca_var[2], "% variance)")
+  ) +
+  scale_color_manual(values = c("chp" = "#E74C3C",
+                                "control" = "#2ECC71",
+                                "ipf" = "#3498DB")) +
+  theme_bw() +
+  theme(legend.title = element_text(face = "bold"))
+print(pca_plot)
+
+ggsave("../../Plots/PCA_plot.png",
+       plot = pca_plot, width = 8, height = 6, dpi = 300)
