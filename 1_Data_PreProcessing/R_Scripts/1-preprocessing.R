@@ -67,16 +67,15 @@ head(meta_clean)
 
 table(meta_clean$batch) # according to the data, if we use the raw data. we will face batch effect. Better to use preprocessed count
 
-###@@@@@@@@issue@@@@@@@###  count kiyanne mokadda
 
-cat("All samples found in metadata:", all(colnames(counts) %in% rownames(meta_clean)), "\n") 
+cat("All samples found in metadata:", all(colnames(gse_150910) %in% rownames(meta_clean)), "\n") 
 
 # Reorder metadata to match count matrix column order
 # meta_clean <- meta_clean[colnames(counts), ] # this is wrong. this should be 'g_data' instead of counts. so i put this in 'DESeq2 Median of Ratios' and corrected.
 
 # Verify perfect alignment
 cat("Perfect alignment:",
-    all(colnames(counts) == rownames(meta_clean)), "\n")
+    all(colnames(gse_150910) == rownames(meta_clean)), "\n")
 
 ##metadata is loaded correctly and check whether it is matching with g_data
 ##----------------------------------------------------->
@@ -88,7 +87,7 @@ cat("Perfect alignment:",
 
 # lets import our dataset
 g_data <- read.csv("../../DATASET/GSE150910_gene-level_count_file.csv", header = TRUE, sep = ",", row.names = 1) 
-# we have a comma seperrated file
+  # we have a comma seperrated file
 
 head(g_data)
 # columns = subjects
@@ -100,17 +99,17 @@ cat("  Samples: ", ncol(g_data), "\n") # column = samples (288)
 # control = 103 
 
 # lets see null values
-anyNA(g_data)
+anyNA(g_data) #no null values found
 sum(is.na(g_data))
 # colSums(is.na(g_data)) # check for each columns
 
-
+#load the ExpressionSet
 gse_150910 <- getGEO("GSE150910",GSEMatrix  = TRUE,AnnotGPL = FALSE, destdir="../../DATASET")
 # Extract metadata
 metadata <- pData(gse_150910[[1]])
 # to see how many data we have in header.
 dim(metadata)
-cat("\nDiagnosis groups:\n")
+
 print(table(metadata$`diagnosis:ch1`))
 
 
