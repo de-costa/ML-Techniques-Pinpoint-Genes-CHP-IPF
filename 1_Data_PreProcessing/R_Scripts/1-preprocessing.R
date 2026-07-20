@@ -386,7 +386,7 @@ colnames(metadata)
 table(metadata$characteristics_ch1)
 write.csv(metadata, file = "../../DATASET/GSE150910_metadata.csv", row.names = TRUE)
 
-counts <- read.csv("D:/Research/original/implementation/step01/GSE150910_de-identified_chp_kallisto_count_summary.csv")
+counts <- read.csv("../../DATASET/GSE150910_de-identified_chp_kallisto_count_summary.csv")
 dim(counts)
 head(counts[, 1:5])
 gene_info <- strsplit(rownames(counts), "\\|")
@@ -470,7 +470,7 @@ meta_clean <- data.frame(
 # Check it
 head(meta_clean)
 # Save it
-write.csv(meta_clean, "DATASET/meta_clean.csv",row.names = FALSE)
+write.csv(meta_clean, "../../DATASET/meta_clean.csv",row.names = FALSE)
 # The title column may contain the sample names like chp_26
 head(metadata$title)
 # See first 10 titles
@@ -479,3 +479,117 @@ metadata$title[1:10]
 
 
 # MATCH METADATA SAMPLE IDs TO COUNT MATRIX
+
+# Add title as sample_id in meta_clean
+meta_clean$sample_id <- metadata$title
+
+# Set title as row names in meta_clean
+rownames(meta_clean) <- meta_clean$sample_id
+# Check all count matrix samples exist in metadata
+all(colnames(counts_clean) %in% rownames(meta_clean))
+# Reorder metadata to match count matrix column order
+meta_clean <- meta_clean[colnames(counts_clean), ]
+# Verify the order matches perfectly
+all(colnames(counts_clean) == rownames(meta_clean))
+# Step 6 - Check result
+head(meta_clean)
+
+# Save the final matched metadata
+write.csv(meta_clean, "../../DATASET/meta_clean_matched.csv",row.names = TRUE)
+
+
+# FILTERING LOW EXPRESSION GENES
+
+#Check the current data range (min, max values)
+summary(counts_clean[1:5, 1:5])
+# Round TPM values to integers (required for DESeq2)
+counts_int <- round(counts_clean)
+# Filter: Keep genes with at least 10 counts at least 10% of samples (29 out of 288)
+min_samples <- round(0.1 * ncol(counts_int))
+keep <- rowSums(counts_int >= 10) >= min_samples
+# Apply the filter
+counts_filtered <- counts_int[keep, ]
+#Check how many genes remain
+cat("Genes before filtering:", nrow(counts_int), "\n")
+cat("Genes after filtering:", nrow(counts_filtered), "\n")
+cat("Genes removed:", nrow(counts_int) - nrow(counts_filtered), "\n")
+
+# Save filtered counts
+write.csv(counts_filtered,"../../DATASET/counts_filtered.csv")
+# Quick check
+cat("Final dimensions:", nrow(counts_filtered), "genes x", ncol(counts_filtered), "samples\n")
+
+
+
+#NORMALIZATION WITH DESeq2
+library(DESeq2)
+
+dds <- DESeqDataSetFromMatrix(
+  countData = counts_filtered,
+  colData   = meta_clean,
+  design    = ~ diagnosis
+)
+
+#Check the object was created successfully
+dds
+
+
+#NORMALIZATION & VST TRANSFORMATION
+
+#Estimate size factors (median-of-ratios normalization)
+# This corrects for differences in sequencing depth between samples
+dds <- estimateSizeFactors(dds)
+
+#Check size factors (should be close to 1.0 for good data)
+sizeFactors(dds)
+
+#Apply Variance Stabilizing Transformation (VST)
+# blind=TRUE means we don't use group info (good for QC/exploration)
+vsd <- vst(dds, blind = TRUE)
+
+#Check VST object
+vsd
+
+#Extract the VST matrix for downstream use
+vst_matrix <- assay(vsd)
+
+
+cat("VST matrix dimensions:", nrow(vst_matrix), "genes x", ncol(vst_matrix), "samples\n")
+
+#######################################################################
+######################################################################
+######################################################################
+#after this part need to be recheck
+
+
+# BATCH EFFECT CORRECTION WITH LIMMA
+
+
+# Install and load limma
+BiocManager::install("limma")
+library(limma)
+
+# Check batch groups we have
+table(meta_clean$batch)
+
+#Convert batch to a factor
+batch <- as.factor(meta_clean$batch)
+
+# Remove batch effects from VST matrix
+# This keeps biological differences (diagnosis) but removes
+# technical differences (batch/date of processing)
+vst_corrected <- removeBatchEffect(vst_matrix, batch = batch,design = model.matrix(~ diagnosis, data = meta_clean))
+#  Check dimensions are preserved
+cat("Corrected matrix dimensions:", nrow(vst_corrected), "genes x", ncol(vst_corrected), "samples\n")
+
+# Save the corrected matrix
+write.csv(vst_corrected,"../../vst_corrected.csv")
+cat("Batch correction complete and saved!\n")
+
+# Check for any NA values introduced
+cat("Any NA values in corrected matrix:",any(is.na(vst_corrected)), "\n")
+# Check value ranges before and after
+cat("VST matrix range - Min:", round(min(vst_matrix), 2), "Max:", round(max(vst_matrix), 2), "\n")
+cat("Corrected matrix range - Min:", round(min(vst_corrected), 2), "Max:", round(max(vst_corrected), 2), "\n")
+# Check the 'other' batch group - how many samples
+table(meta_clean$batch == "other", meta_clean$diagnosis)
