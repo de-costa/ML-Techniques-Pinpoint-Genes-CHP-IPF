@@ -373,6 +373,13 @@ ggsave("../../Plots/PCA_plot.png",
 ###################################################################
 #RESTART THE IMPLEMENTATION USING GSE150910_de-identified_chp_kallisto_count_summary.csv DATA SET
 ###################################################################
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install(c("DESeq2", "limma", "edgeR", "sva"))
+install.packages(c("ggplot2", "pheatmap", "factoextra"))
+
+BiocManager::install("GEOquery")
 
 library(GEOquery)
 
@@ -383,12 +390,27 @@ length(gse)
 metadata <- pData(gse[[1]])
 dim(metadata)
 colnames(metadata)
-table(metadata$characteristics_ch1)
-write.csv(metadata, file = "../../DATASET/GSE150910_metadata.csv", row.names = TRUE)
 
-counts <- read.csv("../../DATASET/GSE150910_de-identified_chp_kallisto_count_summary.csv")
+table(metadata$characteristics_ch1)
+
+
+getwd()
+write.csv(metadata, file = "DATASET/GSE150910_metadata.csv", row.names = TRUE)
+
+table(metadata$`diagnosis:ch1`)
+table(metadata$`batch:ch1`)
+write.csv(metadata, "DATASET/GSE150910_metadata.csv")
+
+
+counts <- read.csv("DATASET/GSE150910_de-identified_chp_kallisto_count_summary.csv")
+
 dim(counts)
 head(counts[, 1:5])
+
+counts[1:5, 1]
+colnames(counts)[1:10]
+
+
 gene_info <- strsplit(rownames(counts), "\\|")
 gene_symbols <- sapply(gene_info, function(x) x[6])
 head(gene_symbols)
@@ -396,11 +418,20 @@ head(gene_symbols, 10)
 rownames(counts) <- gene_symbols
 
 
+
+
+
+# Handle Duplicate Genes by Aggregation
+
+
+
+
 #some times there can be duplicate genes. so we have to remove it first
 #Extract clean gene symbols from the long row names
 gene_info <- strsplit(rownames(counts), "\\|")
-gene_symbols <- sapply(gene_info, function(x) x[6])
 
+gene_symbols <- sapply(gene_info, function(x) x[6])
+head(gene_symbols)
 # Add gene symbols as a new column to the counts data
 counts$gene_symbol <- gene_symbols
 
@@ -469,8 +500,13 @@ meta_clean <- data.frame(
 )
 # Check it
 head(meta_clean)
+
+
+
+
+
 # Save it
-write.csv(meta_clean, "../../DATASET/meta_clean.csv",row.names = FALSE)
+write.csv(meta_clean, "DATASET/meta_clean.csv",row.names = FALSE)
 # The title column may contain the sample names like chp_26
 head(metadata$title)
 # See first 10 titles
@@ -495,7 +531,7 @@ all(colnames(counts_clean) == rownames(meta_clean))
 head(meta_clean)
 
 # Save the final matched metadata
-write.csv(meta_clean, "../../DATASET/meta_clean_matched.csv",row.names = TRUE)
+write.csv(meta_clean, "DATASET/meta_clean_matched.csv",row.names = TRUE)
 
 
 # FILTERING LOW EXPRESSION GENES
@@ -515,13 +551,15 @@ cat("Genes after filtering:", nrow(counts_filtered), "\n")
 cat("Genes removed:", nrow(counts_int) - nrow(counts_filtered), "\n")
 
 # Save filtered counts
-write.csv(counts_filtered,"../../DATASET/counts_filtered.csv")
+write.csv(counts_filtered,"DATASET/counts_filtered.csv")
 # Quick check
 cat("Final dimensions:", nrow(counts_filtered), "genes x", ncol(counts_filtered), "samples\n")
 
 
 
+
 #NORMALIZATION WITH DESeq2
+
 library(DESeq2)
 
 dds <- DESeqDataSetFromMatrix(
@@ -543,6 +581,7 @@ dds <- estimateSizeFactors(dds)
 #Check size factors (should be close to 1.0 for good data)
 sizeFactors(dds)
 
+
 #Apply Variance Stabilizing Transformation (VST)
 # blind=TRUE means we don't use group info (good for QC/exploration)
 vsd <- vst(dds, blind = TRUE)
@@ -556,10 +595,6 @@ vst_matrix <- assay(vsd)
 
 cat("VST matrix dimensions:", nrow(vst_matrix), "genes x", ncol(vst_matrix), "samples\n")
 
-#######################################################################
-######################################################################
-######################################################################
-#after this part need to be recheck
 
 
 # BATCH EFFECT CORRECTION WITH LIMMA
@@ -572,24 +607,258 @@ library(limma)
 # Check batch groups we have
 table(meta_clean$batch)
 
-#Convert batch to a factor
+#  Convert batch to a factor
 batch <- as.factor(meta_clean$batch)
 
 # Remove batch effects from VST matrix
 # This keeps biological differences (diagnosis) but removes
 # technical differences (batch/date of processing)
-vst_corrected <- removeBatchEffect(vst_matrix, batch = batch,design = model.matrix(~ diagnosis, data = meta_clean))
-#  Check dimensions are preserved
-cat("Corrected matrix dimensions:", nrow(vst_corrected), "genes x", ncol(vst_corrected), "samples\n")
+vst_corrected <- removeBatchEffect(vst_matrix, 
+                                   batch = batch,
+                                   design = model.matrix(~ diagnosis, 
+                                                         data = meta_clean))
+# Check dimensions are preserved
+cat("Corrected matrix dimensions:", nrow(vst_corrected), "genes x", 
+    ncol(vst_corrected), "samples\n")
 
 # Save the corrected matrix
-write.csv(vst_corrected,"../../vst_corrected.csv")
-cat("Batch correction complete and saved!\n")
+write.csv(vst_corrected,"DATASET/vst_corrected.csv")
+
 
 # Check for any NA values introduced
-cat("Any NA values in corrected matrix:",any(is.na(vst_corrected)), "\n")
+cat("Any NA values in corrected matrix:", any(is.na(vst_corrected)), "\n")
 # Check value ranges before and after
-cat("VST matrix range - Min:", round(min(vst_matrix), 2), "Max:", round(max(vst_matrix), 2), "\n")
+cat("VST matrix range - Min:", round(min(vst_matrix), 2),"Max:", round(max(vst_matrix), 2), "\n")
 cat("Corrected matrix range - Min:", round(min(vst_corrected), 2), "Max:", round(max(vst_corrected), 2), "\n")
 # Check the 'other' batch group - how many samples
 table(meta_clean$batch == "other", meta_clean$diagnosis)
+
+
+
+
+
+# Convert 2020-06-05 format to 6/5/2020 format
+meta_clean$batch <- gsub(
+  "(\\d{4})-(\\d{2})-(\\d{2})",
+  "\\2/\\3/\\1",
+  meta_clean$batch)
+
+# Remove leading zeros
+meta_clean$batch <- gsub("/0(\\d)", "/\\1", meta_clean$batch)
+meta_clean$batch <- gsub("^0(\\d)", "\\1", meta_clean$batch)
+
+# Verify conversion
+cat("Batch format after conversion:\n")
+print(table(meta_clean$batch))
+
+
+
+# Re-run batch correction
+batch <- as.factor(meta_clean$batch)
+
+vst_corrected <- removeBatchEffect(
+  vst_matrix,
+  batch  = batch,
+  design = model.matrix(~ diagnosis,
+                        data = meta_clean))
+
+# Check range
+cat("Corrected range - Min:", round(min(vst_corrected), 2),
+    "Max:", round(max(vst_corrected), 2), "\n")
+
+
+# PCA PLOT
+
+library(ggplot2)
+
+pca_result <- prcomp(t(vst_corrected), scale. = FALSE)
+pca_var <- round(100 * pca_result$sdev^2 / sum(pca_result$sdev^2), 1)
+
+pca_df <- data.frame(
+  PC1       = pca_result$x[, 1],
+  PC2       = pca_result$x[, 2],
+  diagnosis = meta_clean$diagnosis,
+  batch     = meta_clean$batch
+)
+
+pca_plot <- ggplot(pca_df, aes(PC1, PC2, color = diagnosis)) +
+  geom_point(size = 2.5, alpha = 0.8) +
+  labs(
+    title = "PCA - GSE150910 After Batch Correction (Gene-Level Counts)",
+    x     = paste0("PC1 (", pca_var[1], "% variance)"),
+    y     = paste0("PC2 (", pca_var[2], "% variance)")
+  ) +
+  scale_color_manual(values = c("chp" = "#E74C3C",
+                                "control" = "#2ECC71",
+                                "ipf" = "#3498DB")) +
+  theme_bw() +
+  theme(legend.title = element_text(face = "bold"))
+
+ggsave("Plots/PCA_plot.png",plot = pca_plot, width = 8, height = 6, dpi = 300)
+print(pca_plot)
+
+
+
+
+# STEP 6.2: SAMPLE DISTANCE HEATMAP
+
+library(pheatmap)
+
+sample_dists <- dist(t(vst_corrected))
+dist_matrix  <- as.matrix(sample_dists)
+
+annotation <- data.frame(
+  Diagnosis = meta_clean$diagnosis,
+  row.names = rownames(meta_clean)
+)
+
+ann_colors <- list(
+  Diagnosis = c(chp     = "#E74C3C",
+                control = "#2ECC71",
+                ipf     = "#3498DB")
+)
+
+pheatmap(dist_matrix,
+         annotation_col  = annotation,
+         annotation_row  = annotation,
+         annotation_colors = ann_colors,
+         show_rownames   = FALSE,
+         show_colnames   = FALSE,
+         main            = "Sample Distance Heatmap - GSE150910 (Gene-Level Counts)",
+         filename        = "Plots/heatmap.png",
+         width           = 10,
+         height          = 8)
+
+
+
+# Save final metadata for Python use
+write.csv(meta_clean,
+          "Dataset/meta_final.csv",
+          row.names = TRUE)
+
+
+
+
+
+
+# FIX: RESAVE ALL FILES WITH CORRECT BATCH FORMAT
+
+
+# Verify batch format is correct
+cat("Current batch format:\n")
+print(table(meta_clean$batch))
+
+#Resave corrected metadata
+write.csv(meta_clean,
+          "Dataset/meta_clean_matched.csv",
+          row.names = TRUE)
+
+
+# Step 3 - Resave corrected VST matrix
+write.csv(vst_corrected,
+          "Dataset/vst_corrected.csv")
+cat("vst_corrected.csv resaved!\n")
+
+# Step 4 - Resave correct PCA plot
+ggsave("Plots/PCA_plot.png",
+       plot   = pca_plot,
+       width  = 8,
+       height = 6,
+       dpi    = 300)
+cat("PCA_plot.png resaved!\n")
+
+# Verify VST range matches expected
+cat("\nVerification:\n")
+cat("VST corrected Min:", round(min(vst_corrected), 2), "\n")
+cat("VST corrected Max:", round(max(vst_corrected), 2), "\n")
+cat("Expected Min: -6.14\n")
+cat("Expected Max: 24.75\n")
+cat("Match:", round(min(vst_corrected), 2) == -6.14, "\n")
+
+
+cat("\nBatch format sample:\n")
+print(head(meta_clean$batch))
+
+
+
+
+# ============================================================
+# VERIFY ALL FILES ARE CORRECT BEFORE MOVING TO STEP 2
+# ============================================================
+
+# Check 1 - vst_corrected
+vst_check <- read.csv("DATASET/vst_corrected.csv", row.names = 1)
+cat("vst_corrected dimensions:", nrow(vst_check), "x", ncol(vst_check), "\n")
+cat("vst_corrected Min:", round(min(vst_check), 2), "\n")
+cat("vst_corrected Max:", round(max(vst_check), 2), "\n")
+cat("Expected: Min=-6.14, Max=24.75\n")
+
+# Check 2 - meta_final
+meta_check <- read.csv("DATASET/meta_final.csv", row.names = 1)
+cat("\nmeta_final dimensions:", nrow(meta_check), "x", ncol(meta_check), "\n")
+cat("Batch format sample:", head(meta_check$batch, 3), "\n")
+cat("Diagnosis groups:\n")
+print(table(meta_check$diagnosis))
+
+# Check 3 - counts_filtered
+counts_check <- read.csv("DATASET/counts_filtered.csv", row.names = 1)
+cat("\ncounts_filtered dimensions:", 
+    nrow(counts_check), "x", ncol(counts_check), "\n")
+
+
+
+# COMPLETE FIX — RE-RUN WITH CORRECT BATCH FORMAT
+
+# Step 1 - Verify current batch format in meta_clean
+cat("Current batch format in meta_clean:\n")
+print(head(meta_clean$batch, 5))
+
+# Step 2 - Check if batch is already in correct format
+# If not, convert it
+if (grepl("\\d{4}-\\d{2}-\\d{2}", meta_clean$batch[1])) {
+  cat("Converting batch format...\n")
+  meta_clean$batch <- gsub(
+    "(\\d{4})-(\\d{2})-(\\d{2})",
+    "\\2/\\3/\\1",
+    meta_clean$batch)
+  meta_clean$batch <- gsub("/0(\\d)", "/\\1", meta_clean$batch)
+  meta_clean$batch <- gsub("^0(\\d)", "\\1", meta_clean$batch)
+} else {
+  cat("Batch already in correct format!\n")
+}
+
+cat("Batch format after check:\n")
+print(head(meta_clean$batch, 5))
+
+# Step 3 - Re-run batch correction with correct format
+cat("\nRunning batch correction...\n")
+batch <- as.factor(meta_clean$batch)
+
+vst_corrected_fixed <- removeBatchEffect(
+  vst_matrix,
+  batch  = batch,
+  design = model.matrix(~ diagnosis, data = meta_clean))
+
+# Step 4 - Verify values are correct
+cat("\nVerification:\n")
+cat("Min:", round(min(vst_corrected_fixed), 2), 
+    "Expected: -6.14\n")
+cat("Max:", round(max(vst_corrected_fixed), 2), 
+    "Expected: 24.75\n")
+cat("Match:", round(min(vst_corrected_fixed), 2) == -6.14, "\n")
+
+# Step 5 - Save to BOTH folders
+write.csv(vst_corrected_fixed, "DATASET/vst_corrected.csv")
+#write.csv(vst_corrected_fixed, "Dataset/vst_corrected.csv")
+write.csv(meta_clean, "DATASET/meta_final.csv", row.names = TRUE)
+#write.csv(meta_clean, "Dataset/meta_final.csv", row.names = TRUE)
+
+cat("\nAll files saved correctly!\n")
+
+# Step 6 - Final verification by reading back
+vst_verify <- read.csv("DATASET/vst_corrected.csv", row.names = 1)
+cat("\nFinal read-back verification:\n")
+cat("Min:", round(min(vst_verify), 2), "\n")
+cat("Max:", round(max(vst_verify), 2), "\n")
+cat("Dimensions:", nrow(vst_verify), "x", ncol(vst_verify), "\n")
+
