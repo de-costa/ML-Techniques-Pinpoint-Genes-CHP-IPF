@@ -862,3 +862,122 @@ cat("Min:", round(min(vst_verify), 2), "\n")
 cat("Max:", round(max(vst_verify), 2), "\n")
 cat("Dimensions:", nrow(vst_verify), "x", ncol(vst_verify), "\n")
 
+
+
+
+#############################################
+#############################################
+#############################################
+#############################################
+#############################################
+#############################################
+
+
+library(limma)
+library(dplyr)
+
+vst_corrected <- read.csv("../../DATASET/vst_corrected.csv", row.names = 1)
+meta_clean <- read.csv("../../DATASET/meta_final.csv",row.names = 1)
+
+# Verify
+cat("VST matrix:", nrow(vst_corrected), "genes x",ncol(vst_corrected), "samples\n")
+cat("Metadata:", nrow(meta_clean), "samples\n")
+print(table(meta_clean$diagnosis))
+
+cat("Aligned:", all(colnames(vst_corrected) == rownames(meta_clean)), "\n")
+
+
+
+vst_matrix <- as.matrix(vst_corrected)
+
+# Set diagnosis as factor
+diagnosis <- factor(meta_clean$diagnosis,levels = c("control", "chp", "ipf"))
+
+design <- model.matrix(~ 0 + diagnosis)
+colnames(design) <- c("control", "chp", "ipf")
+
+cat("Design matrix dimensions:",nrow(design), "samples x", ncol(design), "groups\n")
+cat("First 3 rows:\n")
+print(head(design, 3))
+
+# Fit linear model to expression data
+fit <- lmFit(vst_matrix, design)
+
+# Define contrasts (comparisons between groups)
+contrast_matrix <- makeContrasts(
+  CHP_vs_Control = chp - control,
+  IPF_vs_Control = ipf - control,
+  CHP_vs_IPF     = chp - ipf,
+  levels         = design)
+
+# Apply contrasts and empirical Bayes smoothing
+fit2 <- contrasts.fit(fit, contrast_matrix)
+fit2 <- eBayes(fit2)
+
+cat("\nSummary of significant genes (p<0.05, lfc>=1):\n")
+print(summary(decideTests(fit2, p.value = 0.05, lfc = 1)))
+
+
+# Extract DEGs for each comparison
+deg_chp_ctrl <- topTable(fit2,
+                         coef          = "CHP_vs_Control",
+                         number        = Inf,
+                         adjust.method = "BH",
+                         p.value       = 0.05,
+                         lfc           = 1)
+
+
+deg_ipf_ctrl <- topTable(fit2,
+                         coef          = "IPF_vs_Control",
+                         number        = Inf,
+                         adjust.method = "BH",
+                         p.value       = 0.05,
+                         lfc           = 1)
+
+deg_chp_ipf  <- topTable(fit2,
+                         coef          = "CHP_vs_IPF",
+                         number        = Inf,
+                         adjust.method = "BH",
+                         p.value       = 0.05,
+                         lfc           = 1)
+
+
+
+cat("DEGs in CHP vs Control:", nrow(deg_chp_ctrl), "\n")
+cat("DEGs in IPF vs Control:", nrow(deg_ipf_ctrl), "\n")
+cat("DEGs in CHP vs IPF:    ", nrow(deg_chp_ipf),  "\n")
+
+
+# Get gene names from each comparison
+genes_chp_ctrl <- rownames(deg_chp_ctrl)
+genes_ipf_ctrl <- rownames(deg_ipf_ctrl)
+genes_chp_ipf  <- rownames(deg_chp_ipf)
+
+# Union of all DEGs across all comparisons
+all_degs <- union(
+  union(genes_chp_ctrl, genes_ipf_ctrl),
+  genes_chp_ipf)
+
+cat("Total unique DEGs:", length(all_degs), "\n")
+
+
+
+# FILTER VST MATRIX TO DEGs ONLY 
+
+# Keep only DEG rows from VST matrix
+vst_degs <- vst_corrected[all_degs, ]
+
+cat("DEG expression matrix:", nrow(vst_degs), "genes x",
+    ncol(vst_degs), "samples\n")
+
+
+
+write.csv(vst_degs, "../../DATASET/vst_degs.csv")
+write.csv(deg_chp_ctrl, "../../DATASET/DEG_CHP_vs_Control.csv")
+write.csv(deg_ipf_ctrl, "../../DATASET/DEG_IPF_vs_Control.csv")
+write.csv(deg_chp_ipf,  "../../DATASET/DEG_CHP_vs_IPF.csv")
+
+
+
+
+
