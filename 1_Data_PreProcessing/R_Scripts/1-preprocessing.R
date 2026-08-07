@@ -395,14 +395,14 @@ table(metadata$characteristics_ch1)
 
 
 getwd()
-write.csv(metadata, file = "DATASET/GSE150910_metadata.csv", row.names = TRUE)
+write.csv(metadata, file = "../../DATASET/GSE150910_metadata.csv", row.names = TRUE)
 
 table(metadata$`diagnosis:ch1`)
 table(metadata$`batch:ch1`)
-write.csv(metadata, "DATASET/GSE150910_metadata.csv")
+write.csv(metadata, "../../DATASET/GSE150910_metadata.csv")
 
 
-counts <- read.csv("DATASET/GSE150910_de-identified_chp_kallisto_count_summary.csv")
+counts <- read.csv("../../DATASET/GSE150910_de-identified_chp_kallisto_count_summary.csv")
 
 dim(counts)
 head(counts[, 1:5])
@@ -481,13 +481,13 @@ prefixes
 table(gsub("_.*", "", colnames(counts_clean)))
 
 # Load metadata
-metadata <- read.csv("DATASET/GSE150910_metadata.csv", row.names = 1)
+metadata <- read.csv("../../DATASET/GSE150910_metadata.csv", row.names = 1)
 
 # Check diagnosis groups
 table(metadata$`diagnosis.ch1`)
 
 # Save the clean count matrix
-write.csv(counts_clean, "DATASET/counts_clean.csv")
+write.csv(counts_clean, "../../DATASET/counts_clean.csv")
 # Check metadata column names for diagnosis
 colnames(metadata)
 # Create a clean simplified metadata table
@@ -506,7 +506,7 @@ head(meta_clean)
 
 
 # Save it
-write.csv(meta_clean, "DATASET/meta_clean.csv",row.names = FALSE)
+write.csv(meta_clean, "../../DATASET/meta_clean.csv",row.names = FALSE)
 # The title column may contain the sample names like chp_26
 head(metadata$title)
 # See first 10 titles
@@ -531,7 +531,7 @@ all(colnames(counts_clean) == rownames(meta_clean))
 head(meta_clean)
 
 # Save the final matched metadata
-write.csv(meta_clean, "DATASET/meta_clean_matched.csv",row.names = TRUE)
+write.csv(meta_clean, "../../DATASET/meta_clean_matched.csv",row.names = TRUE)
 
 
 # FILTERING LOW EXPRESSION GENES
@@ -551,7 +551,7 @@ cat("Genes after filtering:", nrow(counts_filtered), "\n")
 cat("Genes removed:", nrow(counts_int) - nrow(counts_filtered), "\n")
 
 # Save filtered counts
-write.csv(counts_filtered,"DATASET/counts_filtered.csv")
+write.csv(counts_filtered,"../../DATASET/counts_filtered.csv")
 # Quick check
 cat("Final dimensions:", nrow(counts_filtered), "genes x", ncol(counts_filtered), "samples\n")
 
@@ -622,7 +622,7 @@ cat("Corrected matrix dimensions:", nrow(vst_corrected), "genes x",
     ncol(vst_corrected), "samples\n")
 
 # Save the corrected matrix
-write.csv(vst_corrected,"DATASET/vst_corrected.csv")
+write.csv(vst_corrected,"../../DATASET/vst_corrected.csv")
 
 
 # Check for any NA values introduced
@@ -694,8 +694,169 @@ pca_plot <- ggplot(pca_df, aes(PC1, PC2, color = diagnosis)) +
   theme_bw() +
   theme(legend.title = element_text(face = "bold"))
 
-ggsave("Plots/PCA_plot.png",plot = pca_plot, width = 8, height = 6, dpi = 300)
+ggsave("../../Plots/PCA_plot.png",plot = pca_plot, width = 8, height = 6, dpi = 300)
 print(pca_plot)
+
+
+
+
+
+# ============================================================
+# 3D PCA VISUALIZATION
+# ============================================================
+
+# Install required package for 3D plotting
+install.packages("plotly")
+library(plotly)
+
+# Step 1 - Run PCA (already done but run again to be safe)
+pca_result <- prcomp(t(vst_corrected), scale. = FALSE)
+
+# Step 2 - Calculate variance explained
+pca_var <- round(100 * pca_result$sdev^2 /sum(pca_result$sdev^2), 1)
+
+cat("PC1 variance:", pca_var[1], "%\n")
+cat("PC2 variance:", pca_var[2], "%\n")
+cat("PC3 variance:", pca_var[3], "%\n")
+
+# Step 3 - Create 3D PCA dataframe
+pca_df_3d <- data.frame(
+  PC1       = pca_result$x[, 1],
+  PC2       = pca_result$x[, 2],
+  PC3       = pca_result$x[, 3],
+  diagnosis = meta_clean$diagnosis,
+  sample    = rownames(meta_clean))
+
+# Step 4 - Define colors for each group
+colors <- c(
+  "chp"     = "#E74C3C",
+  "control" = "#2ECC71",
+  "ipf"     = "#3498DB")
+
+# Step 5 - Create 3D interactive PCA plot
+pca_3d <- plot_ly(
+  data   = pca_df_3d,
+  x      = ~PC1,
+  y      = ~PC2,
+  z      = ~PC3,
+  color  = ~diagnosis,
+  colors = colors,
+  type   = "scatter3d",
+  mode   = "markers",
+  marker = list(size = 5, opacity = 0.8),
+  text   = ~paste("Sample:", sample,
+                  "<br>Diagnosis:", diagnosis,
+                  "<br>PC1:", round(PC1, 2),
+                  "<br>PC2:", round(PC2, 2),
+                  "<br>PC3:", round(PC3, 2)),
+  hoverinfo = "text") %>%
+  
+  layout(
+    title = list(
+      text = "3D PCA — GSE150910 After Batch Correction",
+      font = list(size = 16)),
+    
+    scene = list(
+      xaxis = list(
+        title = paste0("PC1 (", pca_var[1], "% variance)"),
+        gridcolor = "rgb(50,50,50)",
+        backgroundcolor = "rgb(10,20,40)",
+        showbackground = TRUE),
+      
+      yaxis = list(
+        title = paste0("PC2 (", pca_var[2], "% variance)"),
+        gridcolor = "rgb(50,50,50)",
+        backgroundcolor = "rgb(10,20,40)",
+        showbackground = TRUE),
+      
+      zaxis = list(
+        title = paste0("PC3 (", pca_var[3], "% variance)"),
+        gridcolor = "rgb(50,50,50)",
+        backgroundcolor = "rgb(10,20,40)",
+        showbackground = TRUE),
+      
+      bgcolor = "rgb(10,20,40)"),
+    
+    paper_bgcolor = "rgb(10,20,40)",
+    plot_bgcolor  = "rgb(10,20,40)",
+    font = list(color = "white"),
+    
+    legend = list(
+      title = list(text = "Diagnosis"),
+      font  = list(color = "white")))
+
+# Step 6 - Display interactive plot
+pca_3d
+
+# Step 7 - Save as HTML (interactive)
+htmlwidgets::saveWidget(
+  pca_3d,
+  "../../Plots/PCA_3D_interactive.html",
+  selfcontained = TRUE)
+cat("Interactive 3D PCA saved as HTML!\n")
+
+# Step 8 - Save as static PNG for presentations
+install.packages("orca")
+# OR use this alternative:
+install.packages("webshot2")
+library(webshot2)
+
+#plotly::save_image(pca_3d,file   = "../../Plots/PCA_3D_static.png",width  = 1200,height = 900)
+
+# ── SAVE STATIC 3D PCA ──────────────────────────────
+install.packages("scatterplot3d")
+library(scatterplot3d)
+
+# Set colors per sample
+sample_colors <- ifelse(
+  pca_df_3d$diagnosis == "chp",      "#E74C3C",
+  ifelse(pca_df_3d$diagnosis == "ipf", "#3498DB", "#2ECC71"))
+
+# Save as PNG
+png("../../Plots/PCA_3D_static.png",
+    width  = 1400,
+    height = 1000,
+    res    = 150,
+    bg     = "white")
+
+scatterplot3d(
+  x           = pca_df_3d$PC1,
+  y           = pca_df_3d$PC2,
+  z           = pca_df_3d$PC3,
+  color       = sample_colors,
+  pch         = 16,
+  cex.symbols = 1.2,
+  main        = "3D PCA — GSE150910 After Batch Correction",
+  xlab        = paste0("PC1 (", pca_var[1], "% variance)"),
+  ylab        = paste0("PC2 (", pca_var[2], "% variance)"),
+  zlab        = paste0("PC3 (", pca_var[3], "% variance)"),
+  grid        = TRUE,
+  box         = TRUE,
+  angle       = 45,
+  cex.lab     = 1.1,
+  cex.main    = 1.3)
+
+legend("topright",
+       legend = c("CHP", "Control", "IPF"),
+       col    = c("#E74C3C", "#2ECC71", "#3498DB"),
+       pch    = 16,
+       pt.cex = 1.5,
+       cex    = 1.0,
+       bty    = "n",
+       title  = "Diagnosis")
+
+dev.off()
+cat("Static 3D PCA saved as PNG!\n")
+
+
+
+
+
+
+
+
+
+
 
 
 
